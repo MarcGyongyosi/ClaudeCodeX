@@ -29,10 +29,29 @@ A native desktop GUI wrapper for [Claude Code CLI](https://github.com/anthropics
 
 1. Go to [Releases](https://github.com/MarcGyongyosi/ClaudeCodeX/releases)
 2. Download the appropriate installer for your platform:
-   - macOS: `.dmg` or `.zip`
+   - macOS: `.dmg` (universal - works on Intel and Apple Silicon)
    - Windows: `.exe` installer
    - Linux: `.AppImage` or `.deb`
-3. Install and run
+
+#### macOS Installation (Step-by-Step)
+
+Since the app is not signed with an Apple Developer certificate, macOS will show a security warning. Follow these steps:
+
+1. **Download** the `.dmg` file from Releases
+2. **Open** the DMG and drag "Claude Code" to Applications
+3. **First launch** - Right-click (or Control-click) the app and select "Open"
+   - You'll see a warning: "Claude Code cannot be opened because it is from an unidentified developer"
+   - Click **Done** (not "Move to Trash")
+4. **Allow the app**:
+   - Open **System Settings** (or System Preferences on older macOS)
+   - Go to **Privacy & Security**
+   - Scroll down to the Security section
+   - You'll see: "Claude Code was blocked from use because it is not from an identified developer"
+   - Click **Open Anyway**
+5. **Confirm**: A final dialog will appear - click **Open**
+6. The app will now launch and you won't need to repeat these steps
+
+**Note**: You only need to do this once. After the first successful launch, the app will open normally.
 
 ### From Source
 
