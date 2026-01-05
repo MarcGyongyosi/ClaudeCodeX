@@ -1528,6 +1528,17 @@ function createTerminal() {
   terminal.onData((data) => {
     if (sessionActive) {
       window.claude.terminalInput(data);
+
+      // Clear input-needed state when user provides input
+      sessionStatus.textContent = 'LIVE';
+      sessionStatus.classList.remove('input-needed');
+      sessionStatus.classList.add('live');
+
+      // Remove attention indicator from terminal tab
+      const terminalTab = tabs.get('terminal');
+      if (terminalTab && terminalTab.tabElement) {
+        terminalTab.tabElement.classList.remove('needs-attention');
+      }
     }
   });
 
@@ -1662,11 +1673,25 @@ async function startSession() {
     sessionActive = false;
     sessionStatus.textContent = `EXITED (${code})`;
     sessionStatus.classList.remove('live');
+    sessionStatus.classList.remove('input-needed');
 
     startBtn.style.display = 'block';
     stopBtn.style.display = 'none';
 
     terminal.write('\r\n\x1b[90m--- Session ended ---\x1b[0m\r\n');
+  });
+
+  // Listen for input-needed notifications
+  window.claude.onInputNeeded((data) => {
+    // Add visual indicator to status
+    sessionStatus.textContent = 'INPUT NEEDED';
+    sessionStatus.classList.add('input-needed');
+
+    // Flash the terminal tab if not visible
+    const terminalTab = tabs.get('terminal');
+    if (terminalTab && terminalTab.tabElement) {
+      terminalTab.tabElement.classList.add('needs-attention');
+    }
   });
 }
 

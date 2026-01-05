@@ -1500,6 +1500,45 @@ body {
   animation: pulse 2s infinite;
 }
 
+.session-status.input-needed {
+  color: #f59e0b;
+}
+
+.session-status.input-needed::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: #f59e0b;
+  border-radius: 50%;
+  animation: pulse-urgent 0.8s infinite;
+}
+
+@keyframes pulse-urgent {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+
+/* Tab needs attention indicator */
+.tab.needs-attention {
+  animation: tab-attention 1s infinite;
+}
+
+.tab.needs-attention::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  background: #f59e0b;
+  border-radius: 50%;
+}
+
+@keyframes tab-attention {
+  0%, 100% { background: rgba(245, 158, 11, 0.1); }
+  50% { background: rgba(245, 158, 11, 0.2); }
+}
+
 /* Setup screen styles */
 .setup-message {
   text-align: center;

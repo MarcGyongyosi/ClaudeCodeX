@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('claude', {
   // Terminal events
   onTerminalData: (callback) => ipcRenderer.on('terminal-data', (event, data) => callback(data)),
   onTerminalExit: (callback) => ipcRenderer.on('terminal-exit', (event, code) => callback(code)),
+  onInputNeeded: (callback) => ipcRenderer.on('input-needed', (event, data) => callback(data)),
 
   // File operations
   listFiles: () => ipcRenderer.invoke('list-files'),

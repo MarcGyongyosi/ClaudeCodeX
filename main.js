@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const pty = require('node-pty');
@@ -11,6 +11,90 @@ let mainWindow;
 let ptyProcess = null;
 let installProcess = null;
 let currentWorkingDir = process.env.HOME;
+
+// Notification state
+let notificationCooldown = false;
+let lastNotificationTime = 0;
+const NOTIFICATION_COOLDOWN_MS = 3000; // Minimum time between notifications
+
+// Patterns that indicate Claude needs user input
+const INPUT_NEEDED_PATTERNS = [
+  /\?\s*\(y\/n\)/i,                    // Yes/no prompts
+  /\?\s*\[Y\/n\]/i,                    // Yes/no with default
+  /\?\s*\[y\/N\]/i,                    // Yes/no with default
+  /Press Enter to continue/i,          // Enter prompts
+  /\(yes\/no\)/i,                       // Yes/no spelled out
+  /approve|deny|reject/i,              // Permission prompts
+  /Do you want to/i,                   // Question prompts
+  /Would you like to/i,                // Question prompts
+  /Select an option/i,                 // Selection prompts
+  /Choose.*:/i,                        // Choice prompts
+  /Enter.*:/i,                         // Input prompts
+  /Type your/i,                        // Input prompts
+  /waiting for.*input/i,               // Waiting messages
+  /\[waiting\]/i,                      // Waiting indicator
+  /❯.*\?/,                             // Interactive question with arrow
+  /\?\s*›/,                            // Question with prompt symbol
+];
+
+// Buffer for accumulating output to detect multi-line patterns
+let outputBuffer = '';
+const OUTPUT_BUFFER_MAX = 2000;
+
+function checkForInputNeeded(data) {
+  // Add to buffer
+  outputBuffer += data;
+  if (outputBuffer.length > OUTPUT_BUFFER_MAX) {
+    outputBuffer = outputBuffer.slice(-OUTPUT_BUFFER_MAX);
+  }
+
+  // Check recent output for input-needed patterns
+  const recentOutput = outputBuffer.slice(-500);
+
+  for (const pattern of INPUT_NEEDED_PATTERNS) {
+    if (pattern.test(recentOutput)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function sendInputNeededNotification(preview) {
+  const now = Date.now();
+
+  // Check cooldown
+  if (now - lastNotificationTime < NOTIFICATION_COOLDOWN_MS) {
+    return;
+  }
+
+  // Safety check - window may be closed
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  // Only notify if window is not focused
+  if (!mainWindow.isFocused()) {
+    lastNotificationTime = now;
+
+    const notification = new Notification({
+      title: 'Claude Code needs your input',
+      body: preview || 'Claude is waiting for your response',
+      silent: false
+    });
+
+    notification.on('click', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    });
+
+    notification.show();
+
+    // Also notify renderer for UI indicator
+    mainWindow.webContents.send('input-needed', { preview });
+  }
+}
 
 // Get proper PATH including common Node.js locations
 function getEnvWithPath() {
@@ -64,6 +148,18 @@ function createWindow() {
   });
 
   mainWindow.loadFile('index.html');
+
+  // Handle window close - clean up before window is destroyed
+  mainWindow.on('close', () => {
+    if (ptyProcess) {
+      ptyProcess.kill();
+      ptyProcess = null;
+    }
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
 }
 
 app.whenReady().then(createWindow);
@@ -71,6 +167,7 @@ app.whenReady().then(createWindow);
 app.on('window-all-closed', () => {
   if (ptyProcess) {
     ptyProcess.kill();
+    ptyProcess = null;
   }
   app.quit();
 });
@@ -117,6 +214,10 @@ ipcMain.handle('start-terminal', (event, cols, rows) => {
     ptyProcess.kill();
   }
 
+  // Reset notification state
+  outputBuffer = '';
+  lastNotificationTime = 0;
+
   console.log('Starting Claude in:', currentWorkingDir);
   console.log('Terminal size:', cols, 'x', rows);
 
@@ -137,12 +238,26 @@ ipcMain.handle('start-terminal', (event, cols, rows) => {
 
   // Forward PTY output to renderer
   ptyProcess.onData((data) => {
+    // Safety check - window may be closed
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+
     mainWindow.webContents.send('terminal-data', data);
+
+    // Check if Claude needs user input
+    if (checkForInputNeeded(data)) {
+      // Extract a preview of what's being asked
+      const lines = outputBuffer.split('\n').filter(l => l.trim());
+      const preview = lines.slice(-2).join(' ').slice(0, 100);
+      sendInputNeededNotification(preview);
+    }
   });
 
   ptyProcess.onExit(({ exitCode }) => {
     console.log('Claude exited with code:', exitCode);
-    mainWindow.webContents.send('terminal-exit', exitCode);
+    // Safety check - window may be closed
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('terminal-exit', exitCode);
+    }
     ptyProcess = null;
   });
 
@@ -153,6 +268,8 @@ ipcMain.handle('start-terminal', (event, cols, rows) => {
 ipcMain.handle('terminal-input', (event, data) => {
   if (ptyProcess) {
     ptyProcess.write(data);
+    // Clear output buffer on input to avoid re-triggering same prompt
+    outputBuffer = '';
     return true;
   }
   return false;
@@ -407,12 +524,16 @@ ipcMain.handle('install-claude', () => {
 
     installProcess.stdout.on('data', (data) => {
       output += data.toString();
-      mainWindow.webContents.send('install-progress', data.toString());
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('install-progress', data.toString());
+      }
     });
 
     installProcess.stderr.on('data', (data) => {
       errorOutput += data.toString();
-      mainWindow.webContents.send('install-progress', data.toString());
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('install-progress', data.toString());
+      }
     });
 
     installProcess.on('close', (code) => {
