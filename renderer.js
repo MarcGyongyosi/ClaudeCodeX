@@ -763,6 +763,29 @@ function toggleSplitView() {
     // Ensure proper flex layout
     primaryPanel.style.flex = '1';
     secondaryPanel.style.flex = '1';
+
+    // If current active tab is not terminal, move it to secondary panel
+    // and show terminal in primary
+    if (activeTabId !== 'terminal') {
+      const currentTab = tabs.get(activeTabId);
+      if (currentTab) {
+        // Move current tab to secondary
+        secondaryPanel.appendChild(currentTab.contentElement);
+        currentTab.contentElement.classList.add('active');
+        currentTab.panel = 'secondary';
+
+        // Show terminal in primary
+        const terminalTab = tabs.get('terminal');
+        if (terminalTab) {
+          terminalTab.contentElement.classList.add('active');
+        }
+
+        // Refit terminal
+        if (fitAddon && terminal) {
+          setTimeout(() => fitAddon.fit(), 50);
+        }
+      }
+    }
   } else {
     // Move all tabs from secondary back to primary
     const secondaryTabs = secondaryPanel.querySelectorAll('.tab-content');
@@ -801,20 +824,37 @@ function moveTabToPanel(tabId, panel) {
   const tab = tabs.get(tabId);
   if (!tab) return;
 
+  const sourcePanel = tab.panel;
   const targetPanel = panel === 'secondary' ? secondaryPanel : primaryPanel;
+  const sourcePanelEl = sourcePanel === 'secondary' ? secondaryPanel : primaryPanel;
 
-  // First, deactivate all tabs in target panel
+  // Deactivate all tabs in target panel
   targetPanel.querySelectorAll('.tab-content').forEach(content => {
     content.classList.remove('active');
   });
 
-  // Move and activate
+  // Move and activate in target
   targetPanel.appendChild(tab.contentElement);
   tab.contentElement.classList.add('active');
   tab.panel = panel;
 
-  // Refit terminal if we're moving it
-  if (tabId === 'terminal' && fitAddon && terminal) {
+  // Find another tab to activate in the source panel
+  const remainingTabsInSource = [];
+  tabs.forEach((t, id) => {
+    if (t.panel === sourcePanel && id !== tabId) {
+      remainingTabsInSource.push({ id, tab: t });
+    }
+  });
+
+  if (remainingTabsInSource.length > 0) {
+    // Activate the first remaining tab (prefer terminal)
+    const terminalInSource = remainingTabsInSource.find(t => t.id === 'terminal');
+    const tabToActivate = terminalInSource || remainingTabsInSource[0];
+    tabToActivate.tab.contentElement.classList.add('active');
+  }
+
+  // Refit terminal if needed
+  if (fitAddon && terminal) {
     setTimeout(() => fitAddon.fit(), 50);
   }
 }
@@ -965,24 +1005,10 @@ function handleTabContextMenuAction(e) {
   hideContextMenu();
 }
 
-// Move tab to a panel and update its state
+// Move tab to a panel and update its state (called from context menu)
 function moveTabToPanelWithUI(tabId, panel) {
-  const tab = tabs.get(tabId);
-  if (!tab) return;
-
-  const targetPanel = panel === 'secondary' ? secondaryPanel : primaryPanel;
-
-  // Move the content element
-  targetPanel.appendChild(tab.contentElement);
-  tab.panel = panel;
-
-  // Make it active in the new panel
-  tab.contentElement.classList.add('active');
-
-  // Refit terminal if moving terminal tab
-  if (tabId === 'terminal' && fitAddon && terminal) {
-    setTimeout(() => fitAddon.fit(), 10);
-  }
+  // Just use the main moveTabToPanel function which handles everything
+  moveTabToPanel(tabId, panel);
 }
 
 // Recursively expand all subdirectories
