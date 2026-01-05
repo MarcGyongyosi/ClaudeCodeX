@@ -31,5 +31,12 @@ contextBridge.exposeInMainWorld('claude', {
   processExcel: (path) => ipcRenderer.invoke('process-excel', path),
   processWord: (path) => ipcRenderer.invoke('process-word', path),
   processCsv: (path) => ipcRenderer.invoke('process-csv', path),
-  getFileUrl: (path) => ipcRenderer.invoke('get-file-url', path)
+  getFileUrl: (path) => ipcRenderer.invoke('get-file-url', path),
+
+  // Claude Code CLI management
+  checkClaudeInstalled: () => ipcRenderer.invoke('check-claude-installed'),
+  checkNpmInstalled: () => ipcRenderer.invoke('check-npm-installed'),
+  installClaude: () => ipcRenderer.invoke('install-claude'),
+  openInstallGuide: () => ipcRenderer.invoke('open-install-guide'),
+  onInstallProgress: (callback) => ipcRenderer.on('install-progress', (event, data) => callback(data))
 });

@@ -5,10 +5,49 @@ const pty = require('node-pty');
 const XLSX = require('xlsx');
 const mammoth = require('mammoth');
 const Papa = require('papaparse');
+const { execSync, spawn } = require('child_process');
 
 let mainWindow;
 let ptyProcess = null;
+let installProcess = null;
 let currentWorkingDir = process.env.HOME;
+
+// Get proper PATH including common Node.js locations
+function getEnvWithPath() {
+  const env = { ...process.env };
+  const additionalPaths = [
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+    '/usr/local/nodejs/bin',
+    path.join(process.env.HOME, '.nvm/versions/node'),
+    path.join(process.env.HOME, '.npm-global/bin'),
+    '/usr/bin'
+  ];
+  env.PATH = additionalPaths.join(':') + ':' + (env.PATH || '');
+  return env;
+}
+
+// Check if Claude Code CLI is installed
+function checkClaudeInstalled() {
+  const env = getEnvWithPath();
+  try {
+    execSync('which claude', { env, stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Check if npm is installed
+function checkNpmInstalled() {
+  const env = getEnvWithPath();
+  try {
+    execSync('which npm', { env, stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -334,4 +373,65 @@ ipcMain.handle('process-csv', async (event, filePath) => {
 // Get file path for PDF (we'll render in browser with pdf.js)
 ipcMain.handle('get-file-url', (event, filePath) => {
   return `file://${filePath}`;
+});
+
+// Check if Claude Code CLI is installed
+ipcMain.handle('check-claude-installed', () => {
+  return checkClaudeInstalled();
+});
+
+// Check if npm is available
+ipcMain.handle('check-npm-installed', () => {
+  return checkNpmInstalled();
+});
+
+// Install Claude Code CLI
+ipcMain.handle('install-claude', () => {
+  return new Promise((resolve) => {
+    if (installProcess) {
+      resolve({ success: false, error: 'Installation already in progress' });
+      return;
+    }
+
+    const env = getEnvWithPath();
+    env.TERM = 'xterm-256color';
+
+    // Use npm to install globally
+    installProcess = spawn('npm', ['install', '-g', '@anthropic-ai/claude-code'], {
+      env,
+      shell: true
+    });
+
+    let output = '';
+    let errorOutput = '';
+
+    installProcess.stdout.on('data', (data) => {
+      output += data.toString();
+      mainWindow.webContents.send('install-progress', data.toString());
+    });
+
+    installProcess.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+      mainWindow.webContents.send('install-progress', data.toString());
+    });
+
+    installProcess.on('close', (code) => {
+      installProcess = null;
+      if (code === 0) {
+        resolve({ success: true, output });
+      } else {
+        resolve({ success: false, error: errorOutput || 'Installation failed', code });
+      }
+    });
+
+    installProcess.on('error', (err) => {
+      installProcess = null;
+      resolve({ success: false, error: err.message });
+    });
+  });
+});
+
+// Open URL for manual install instructions
+ipcMain.handle('open-install-guide', () => {
+  shell.openExternal('https://github.com/anthropics/claude-code#installation');
 });

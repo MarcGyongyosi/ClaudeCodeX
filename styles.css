@@ -373,6 +373,7 @@ body {
 .panels-container {
   flex: 1;
   display: flex;
+  flex-direction: row;
   overflow: hidden;
   position: relative;
 }
@@ -383,10 +384,12 @@ body {
   flex-direction: column;
   overflow: hidden;
   min-width: 200px;
+  position: relative;
 }
 
 .panel.hidden {
-  display: none;
+  display: none !important;
+  flex: 0;
 }
 
 /* Resize handle for split view */
@@ -1297,4 +1300,114 @@ body {
   height: 6px;
   background: var(--volt);
   animation: pulse 2s infinite;
+}
+
+/* Setup screen styles */
+.setup-message {
+  text-align: center;
+  color: var(--gray-50);
+  margin-bottom: 24px;
+}
+
+.setup-message h2 {
+  color: var(--gray-10);
+  font-size: 18px;
+  font-weight: 300;
+  margin-bottom: 16px;
+  letter-spacing: 0.02em;
+}
+
+.setup-message p {
+  margin: 6px 0;
+  font-size: 12px;
+}
+
+.setup-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.btn-large {
+  padding: 12px 24px;
+  font-size: 13px;
+}
+
+.btn-icon {
+  margin-right: 8px;
+}
+
+.install-status {
+  margin-top: 24px;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-80);
+  padding: 16px;
+}
+
+.install-status.hidden {
+  display: none;
+}
+
+.install-status-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--volt);
+}
+
+.install-output {
+  background: var(--gray-90);
+  padding: 12px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--gray-30);
+  max-height: 150px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+
+.npm-missing {
+  margin-top: 24px;
+  padding: 16px;
+  background: rgba(218, 30, 40, 0.1);
+  border: 1px solid var(--red-50);
+  text-align: center;
+}
+
+.npm-missing.hidden {
+  display: none;
+}
+
+.error-text {
+  color: var(--red-50);
+  margin-bottom: 12px;
+}
+
+.install-link {
+  color: var(--volt);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.install-link:hover {
+  text-decoration: underline;
+}
+
+.install-success {
+  color: var(--green-50);
+  text-align: center;
+  margin-top: 16px;
+}
+
+.install-error {
+  color: var(--red-50);
+  text-align: center;
+  margin-top: 16px;
 }

@@ -9,6 +9,7 @@ const stopBtn = document.getElementById('stop-btn');
 const dropZone = document.getElementById('drop-zone');
 const fileTree = document.getElementById('file-tree');
 const refreshFilesBtn = document.getElementById('refresh-files-btn');
+const setupScreen = document.getElementById('setup-screen');
 const welcomeScreen = document.getElementById('welcome-screen');
 const terminalContainer = document.getElementById('terminal-container');
 const sessionStatus = document.getElementById('session-status');
@@ -23,10 +24,19 @@ const contextMenu = document.getElementById('context-menu');
 const dirContextMenu = document.getElementById('dir-context-menu');
 const tabContextMenu = document.getElementById('tab-context-menu');
 
+// Setup screen elements
+const installClaudeBtn = document.getElementById('install-claude-btn');
+const manualInstallBtn = document.getElementById('manual-install-btn');
+const installStatus = document.getElementById('install-status');
+const installOutput = document.getElementById('install-output');
+const npmMissing = document.getElementById('npm-missing');
+const nodejsLink = document.getElementById('nodejs-link');
+
 let terminal = null;
 let fitAddon = null;
 let sessionActive = false;
 let splitViewActive = false;
+let claudeInstalled = false;
 
 // Tab management
 const tabs = new Map(); // id -> { type, title, element, contentElement, data, panel }
@@ -39,9 +49,21 @@ let tabContextMenuTarget = null; // For tab context menu
 
 // Initialize
 async function init() {
+  // Check if Claude Code CLI is installed
+  claudeInstalled = await window.claude.checkClaudeInstalled();
+
+  if (!claudeInstalled) {
+    // Show setup screen
+    showSetupScreen();
+  } else {
+    // Show welcome screen
+    showWelcomeScreen();
+  }
+
   const cwd = await window.claude.getCwd();
   updateFolderPath(cwd);
   setupEventListeners();
+  setupInstallHandlers();
   await refreshFileTree();
 
   // Initialize terminal tab in the map
@@ -56,6 +78,78 @@ async function init() {
 
   // Load recent sessions
   updateRecentSessionsUI();
+}
+
+// Show setup screen for installing Claude
+function showSetupScreen() {
+  setupScreen.classList.remove('hidden');
+  welcomeScreen.classList.add('hidden');
+  terminalContainer.classList.add('hidden');
+  startBtn.disabled = true;
+}
+
+// Show welcome screen (Claude is installed)
+function showWelcomeScreen() {
+  setupScreen.classList.add('hidden');
+  welcomeScreen.classList.remove('hidden');
+  terminalContainer.classList.add('hidden');
+  startBtn.disabled = false;
+}
+
+// Setup install button handlers
+function setupInstallHandlers() {
+  if (installClaudeBtn) {
+    installClaudeBtn.addEventListener('click', async () => {
+      // Check if npm is available
+      const npmInstalled = await window.claude.checkNpmInstalled();
+
+      if (!npmInstalled) {
+        npmMissing.classList.remove('hidden');
+        return;
+      }
+
+      // Start installation
+      installClaudeBtn.disabled = true;
+      installClaudeBtn.innerHTML = '<span class="btn-icon">◌</span> Installing...';
+      installStatus.classList.remove('hidden');
+      installOutput.textContent = 'Starting installation...\n';
+
+      // Listen for progress
+      window.claude.onInstallProgress((data) => {
+        installOutput.textContent += data;
+        installOutput.scrollTop = installOutput.scrollHeight;
+      });
+
+      const result = await window.claude.installClaude();
+
+      if (result.success) {
+        installOutput.textContent += '\n✓ Installation complete!\n';
+        claudeInstalled = true;
+
+        // Show success and transition to welcome screen
+        setTimeout(() => {
+          showWelcomeScreen();
+        }, 1500);
+      } else {
+        installOutput.textContent += `\n✗ Installation failed: ${result.error}\n`;
+        installClaudeBtn.disabled = false;
+        installClaudeBtn.innerHTML = '<span class="btn-icon">▶</span> Retry Installation';
+      }
+    });
+  }
+
+  if (manualInstallBtn) {
+    manualInstallBtn.addEventListener('click', () => {
+      window.claude.openInstallGuide();
+    });
+  }
+
+  if (nodejsLink) {
+    nodejsLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.claude.openUrlExternal('https://nodejs.org');
+    });
+  }
 }
 
 function updateFolderPath(path) {
@@ -665,10 +759,15 @@ function toggleSplitView() {
     secondaryPanel.classList.remove('hidden');
     resizeHandle.classList.remove('hidden');
     splitViewBtn.classList.add('active');
+
+    // Ensure proper flex layout
+    primaryPanel.style.flex = '1';
+    secondaryPanel.style.flex = '1';
   } else {
     // Move all tabs from secondary back to primary
     const secondaryTabs = secondaryPanel.querySelectorAll('.tab-content');
     secondaryTabs.forEach(content => {
+      content.classList.remove('active');
       primaryPanel.appendChild(content);
       // Update tab panel property
       const tabId = content.dataset.tabId;
@@ -681,8 +780,15 @@ function toggleSplitView() {
     splitViewBtn.classList.remove('active');
 
     // Reset primary panel width
-    primaryPanel.style.flex = '';
+    primaryPanel.style.flex = '1';
     primaryPanel.style.width = '';
+    secondaryPanel.style.flex = '';
+
+    // Ensure active tab in primary is visible
+    const activeTab = tabs.get(activeTabId);
+    if (activeTab) {
+      activeTab.contentElement.classList.add('active');
+    }
 
     // Refit terminal
     if (fitAddon && terminal) {
@@ -696,9 +802,21 @@ function moveTabToPanel(tabId, panel) {
   if (!tab) return;
 
   const targetPanel = panel === 'secondary' ? secondaryPanel : primaryPanel;
+
+  // First, deactivate all tabs in target panel
+  targetPanel.querySelectorAll('.tab-content').forEach(content => {
+    content.classList.remove('active');
+  });
+
+  // Move and activate
   targetPanel.appendChild(tab.contentElement);
   tab.contentElement.classList.add('active');
   tab.panel = panel;
+
+  // Refit terminal if we're moving it
+  if (tabId === 'terminal' && fitAddon && terminal) {
+    setTimeout(() => fitAddon.fit(), 50);
+  }
 }
 
 function setupResizeHandle() {
@@ -1219,6 +1337,16 @@ async function startSessionInDirectory(dirPath) {
 
 // Session management
 async function startSession() {
+  // Re-check Claude installation (in case user installed manually)
+  if (!claudeInstalled) {
+    claudeInstalled = await window.claude.checkClaudeInstalled();
+    if (!claudeInstalled) {
+      showSetupScreen();
+      return;
+    }
+    showWelcomeScreen();
+  }
+
   const cwd = await window.claude.getCwd();
   if (!cwd) {
     alert('Please select a working directory first');

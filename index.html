@@ -95,8 +95,39 @@
                 </div>
               </div>
 
+              <!-- Setup screen (shown when Claude CLI not installed) -->
+              <div id="setup-screen" class="welcome-screen hidden">
+                <div class="welcome-content">
+                  <div class="setup-message">
+                    <h2>◆ SETUP REQUIRED</h2>
+                    <p>Claude Code CLI is not installed on your system.</p>
+                    <p class="note">One-click install below, or install manually via npm.</p>
+                  </div>
+                  <div class="setup-actions">
+                    <button id="install-claude-btn" class="btn btn-primary btn-large">
+                      <span class="btn-icon">▶</span>
+                      Install Claude Code
+                    </button>
+                    <button id="manual-install-btn" class="btn btn-secondary">
+                      View Manual Instructions
+                    </button>
+                  </div>
+                  <div id="install-status" class="install-status hidden">
+                    <div class="install-status-header">
+                      <span class="status-indicator active"></span>
+                      <span>Installing...</span>
+                    </div>
+                    <pre id="install-output" class="install-output"></pre>
+                  </div>
+                  <div id="npm-missing" class="npm-missing hidden">
+                    <p class="error-text">npm is not installed. Please install Node.js first:</p>
+                    <a href="https://nodejs.org" class="install-link" id="nodejs-link">Download Node.js →</a>
+                  </div>
+                </div>
+              </div>
+
               <!-- Welcome screen (shown before session starts) -->
-              <div id="welcome-screen" class="welcome-screen">
+              <div id="welcome-screen" class="welcome-screen hidden">
                 <div class="welcome-content">
                   <div class="welcome-message">
                     <h2>◆ CLAUDE CODE INTERFACE</h2>
