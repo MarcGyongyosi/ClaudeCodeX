@@ -81,10 +81,23 @@ async function init() {
 
   // Initialize terminal tab in the map
   const primaryElements = getPanelElements('primary');
+  const terminalTabEl = primaryElements.tabBar.querySelector('[data-tab-id="terminal"]');
+
+  // Make terminal tab draggable
+  terminalTabEl.draggable = true;
+  terminalTabEl.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('text/plain', 'terminal');
+    terminalTabEl.classList.add('dragging');
+  });
+  terminalTabEl.addEventListener('dragend', () => {
+    terminalTabEl.classList.remove('dragging');
+    document.querySelectorAll('.panel-tabs').forEach(tb => tb.classList.remove('drag-over'));
+  });
+
   tabs.set('terminal', {
     type: 'terminal',
     title: 'Terminal',
-    tabElement: primaryElements.tabBar.querySelector('[data-tab-id="terminal"]'),
+    tabElement: terminalTabEl,
     contentElement: document.getElementById('tab-terminal'),
     closeable: false,
     panel: 'primary'
@@ -196,6 +209,31 @@ function setupPanelTabHandlers(panelName) {
     activateTabInPanel(tabId, panelName);
   });
 
+  // Drag and drop for tabs
+  tabBar.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    tabBar.classList.add('drag-over');
+  });
+
+  tabBar.addEventListener('dragleave', (e) => {
+    if (!tabBar.contains(e.relatedTarget)) {
+      tabBar.classList.remove('drag-over');
+    }
+  });
+
+  tabBar.addEventListener('drop', (e) => {
+    e.preventDefault();
+    tabBar.classList.remove('drag-over');
+
+    const tabId = e.dataTransfer.getData('text/plain');
+    if (tabId && splitViewActive) {
+      const tab = tabs.get(tabId);
+      if (tab && tab.panel !== panelName) {
+        moveTabToPanel(tabId, panelName, true);
+      }
+    }
+  });
+
   tabBar.addEventListener('contextmenu', (e) => {
     const tabEl = e.target.closest('.tab');
     if (!tabEl) return;
@@ -304,6 +342,7 @@ function createTab(type, title, data = {}, panelName = 'primary') {
   const tabEl = document.createElement('div');
   tabEl.className = 'tab';
   tabEl.dataset.tabId = id;
+  tabEl.draggable = true;
 
   const iconClass = type === 'file' ? 'file' : type === 'browser' ? 'browser' : '';
   const icon = type === 'file' ? '◇' : type === 'browser' ? '◎' : '◆';
@@ -313,6 +352,18 @@ function createTab(type, title, data = {}, panelName = 'primary') {
     <span class="tab-title">${escapeHtml(title)}</span>
     <span class="tab-close">×</span>
   `;
+
+  // Drag handlers
+  tabEl.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('text/plain', id);
+    tabEl.classList.add('dragging');
+  });
+
+  tabEl.addEventListener('dragend', () => {
+    tabEl.classList.remove('dragging');
+    // Remove drag-over from all tab bars
+    document.querySelectorAll('.panel-tabs').forEach(tb => tb.classList.remove('drag-over'));
+  });
 
   tabBar.appendChild(tabEl);
 
@@ -430,6 +481,8 @@ function getFileType(filePath) {
     csv: 'csv',
     // Images
     png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', svg: 'image', webp: 'image',
+    // HTML
+    html: 'html', htm: 'html',
     // Text/code (default)
   };
   return typeMap[ext] || 'text';
@@ -482,6 +535,9 @@ async function openFileInTab(filePath, inSidePanel = false) {
       case 'image':
         await renderImage(tab, filePath);
         break;
+      case 'html':
+        await renderHtml(tab, filePath);
+        break;
       case 'powerpoint':
         // PowerPoint is complex - offer to open externally
         renderPowerPoint(tab, filePath);
@@ -529,22 +585,40 @@ async function renderExcel(tab, filePath) {
   const result = await window.claude.processExcel(filePath);
   if (!result.success) throw new Error(result.error);
 
+  // Calculate stats for each sheet
+  const sheetStats = {};
+  result.sheetNames.forEach(name => {
+    const data = result.sheets[name];
+    sheetStats[name] = {
+      rows: data.length,
+      cols: data[0] ? data[0].length : 0
+    };
+  });
+
   let sheetsHtml = '';
   if (result.sheetNames.length > 1) {
     sheetsHtml = `
       <div class="sheet-tabs">
         ${result.sheetNames.map((name, i) => `
-          <button class="sheet-tab ${i === 0 ? 'active' : ''}" data-sheet="${escapeHtml(name)}">${escapeHtml(name)}</button>
+          <button class="sheet-tab ${i === 0 ? 'active' : ''}" data-sheet="${escapeHtml(name)}">
+            ${escapeHtml(name)}
+            <span class="sheet-count">${sheetStats[name].rows}×${sheetStats[name].cols}</span>
+          </button>
         `).join('')}
       </div>
     `;
   }
 
+  const firstSheet = result.sheetNames[0];
+  const statsText = result.sheetNames.length > 1
+    ? `${result.sheetNames.length} sheets`
+    : `${sheetStats[firstSheet].rows} rows × ${sheetStats[firstSheet].cols} columns`;
+
   const sheetsContent = result.sheetNames.map((name, i) => {
     const data = result.sheets[name];
     return `
       <div class="sheet-content ${i === 0 ? 'active' : ''}" data-sheet="${escapeHtml(name)}">
-        ${renderTable(data)}
+        ${renderExcelTable(data)}
       </div>
     `;
   }).join('');
@@ -553,10 +627,11 @@ async function renderExcel(tab, filePath) {
     <div class="file-viewer excel-viewer">
       <div class="file-viewer-header">
         <span>${escapeHtml(filePath)}</span>
+        <span class="file-stats">${statsText}</span>
         <button class="icon-btn add-to-context-btn" title="Add to Claude context">+</button>
       </div>
       ${sheetsHtml}
-      <div class="file-viewer-content table-container">
+      <div class="file-viewer-content table-container excel-table-container">
         ${sheetsContent}
       </div>
     </div>
@@ -576,6 +651,66 @@ async function renderExcel(tab, filePath) {
   tab.contentElement.querySelector('.add-to-context-btn')?.addEventListener('click', () => {
     addFileToContext(filePath);
   });
+}
+
+// Get Excel-style column letter (A, B, C, ... Z, AA, AB, ...)
+function getColumnLetter(index) {
+  let letter = '';
+  while (index >= 0) {
+    letter = String.fromCharCode((index % 26) + 65) + letter;
+    index = Math.floor(index / 26) - 1;
+  }
+  return letter;
+}
+
+// Render Excel-style table with row numbers and column letters
+function renderExcelTable(data) {
+  if (!data || data.length === 0) return '<p class="empty-state">No data</p>';
+
+  const maxRows = 1000;
+  const displayData = data.slice(0, maxRows);
+  const colCount = displayData[0] ? displayData[0].length : 0;
+
+  let html = '<table class="data-table excel-table"><thead>';
+
+  // Column header row (A, B, C, ...)
+  html += '<tr class="column-header-row"><th class="row-number-header"></th>';
+  for (let c = 0; c < colCount; c++) {
+    html += `<th class="column-letter">${getColumnLetter(c)}</th>`;
+  }
+  html += '</tr>';
+
+  // Data header row (first row of data)
+  if (displayData[0]) {
+    html += '<tr class="data-header-row"><th class="row-number">1</th>';
+    displayData[0].forEach((cell) => {
+      html += `<th>${escapeHtml(String(cell ?? ''))}</th>`;
+    });
+    html += '</tr>';
+  }
+  html += '</thead><tbody>';
+
+  // Data rows
+  for (let i = 1; i < displayData.length; i++) {
+    const row = displayData[i];
+    html += `<tr><td class="row-number">${i + 1}</td>`;
+    for (let c = 0; c < colCount; c++) {
+      const cell = row[c];
+      const cellValue = cell ?? '';
+      const isNumber = typeof cell === 'number' || (typeof cell === 'string' && !isNaN(parseFloat(cell)) && cell.trim() !== '');
+      const cellClass = isNumber ? 'cell-number' : '';
+      html += `<td class="${cellClass}">${escapeHtml(String(cellValue))}</td>`;
+    }
+    html += '</tr>';
+  }
+
+  html += '</tbody></table>';
+
+  if (data.length > maxRows) {
+    html += `<p class="table-truncated">Showing ${maxRows} of ${data.length} rows</p>`;
+  }
+
+  return html;
 }
 
 // Render Word document
@@ -634,6 +769,59 @@ async function renderImage(tab, filePath) {
       </div>
     </div>
   `;
+
+  tab.contentElement.querySelector('.add-to-context-btn')?.addEventListener('click', () => {
+    addFileToContext(filePath);
+  });
+}
+
+// Render HTML with preview toggle
+async function renderHtml(tab, filePath) {
+  const result = await window.claude.readFile(filePath);
+  if (!result.success) throw new Error(result.error);
+
+  const fileUrl = await window.claude.getFileUrl(filePath);
+
+  // Create viewer with toggle
+  tab.contentElement.innerHTML = `
+    <div class="file-viewer html-viewer">
+      <div class="file-viewer-header">
+        <span>${escapeHtml(filePath)}</span>
+        <div class="view-toggle">
+          <button class="toggle-btn active" data-view="preview" title="Preview">◉ Preview</button>
+          <button class="toggle-btn" data-view="source" title="Source">◇ Source</button>
+        </div>
+        <button class="icon-btn add-to-context-btn" title="Add to Claude context">+</button>
+      </div>
+      <div class="html-preview-container active" data-view="preview">
+        <webview class="html-preview" src="${fileUrl}" allowpopups></webview>
+      </div>
+      <div class="html-source-container" data-view="source">
+        <pre class="html-source">${escapeHtml(result.content)}</pre>
+      </div>
+    </div>
+  `;
+
+  // Toggle handlers
+  const toggleBtns = tab.contentElement.querySelectorAll('.toggle-btn');
+  const previewContainer = tab.contentElement.querySelector('.html-preview-container');
+  const sourceContainer = tab.contentElement.querySelector('.html-source-container');
+
+  toggleBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const view = btn.dataset.view;
+      toggleBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      if (view === 'preview') {
+        previewContainer.classList.add('active');
+        sourceContainer.classList.remove('active');
+      } else {
+        previewContainer.classList.remove('active');
+        sourceContainer.classList.add('active');
+      }
+    });
+  });
 
   tab.contentElement.querySelector('.add-to-context-btn')?.addEventListener('click', () => {
     addFileToContext(filePath);

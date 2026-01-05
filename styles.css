@@ -391,6 +391,17 @@ body {
   background: var(--gray-70);
 }
 
+/* Tab dragging */
+.tab.dragging {
+  opacity: 0.5;
+}
+
+.panel-tabs.drag-over {
+  background: var(--gray-80);
+  outline: 2px dashed var(--onetrack-red);
+  outline-offset: -2px;
+}
+
 
 /* Panels container */
 .panels-container {
@@ -567,6 +578,10 @@ body {
   padding: 0;
 }
 
+.excel-table-container {
+  background: var(--gray-100);
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -603,6 +618,84 @@ body {
   background: var(--gray-90);
 }
 
+/* Excel-specific table styles */
+.excel-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.excel-table .column-header-row {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.excel-table .column-header-row th {
+  background: var(--gray-80);
+  color: var(--gray-50);
+  font-weight: 400;
+  font-size: 10px;
+  text-align: center;
+  padding: 4px 10px;
+  border-bottom: 2px solid var(--gray-70);
+}
+
+.excel-table .row-number-header {
+  width: 40px;
+  min-width: 40px;
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: var(--gray-80);
+}
+
+.excel-table .data-header-row {
+  position: sticky;
+  top: 26px;
+  z-index: 2;
+}
+
+.excel-table .data-header-row th {
+  background: var(--gray-90);
+  color: var(--volt);
+  font-weight: 500;
+  border-bottom: 2px solid var(--onetrack-red);
+}
+
+.excel-table .row-number {
+  width: 40px;
+  min-width: 40px;
+  background: var(--gray-90);
+  color: var(--gray-50);
+  text-align: center;
+  font-size: 10px;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  border-right: 2px solid var(--gray-70);
+}
+
+.excel-table .column-letter {
+  min-width: 80px;
+}
+
+.excel-table .cell-number {
+  text-align: right;
+  color: var(--blue-60);
+}
+
+.excel-table tbody tr:nth-child(even) td:not(.row-number) {
+  background: var(--gray-100);
+}
+
+.excel-table tbody tr:nth-child(odd) td:not(.row-number) {
+  background: #1a1a1a;
+}
+
+.excel-table tbody tr:hover td:not(.row-number) {
+  background: var(--gray-80);
+}
+
 .table-truncated {
   padding: 12px;
   text-align: center;
@@ -610,6 +703,23 @@ body {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+/* File stats in header */
+.file-stats {
+  margin-left: auto;
+  margin-right: 8px;
+  font-size: 10px;
+  color: var(--gray-50);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Sheet count badge */
+.sheet-count {
+  font-size: 9px;
+  color: var(--gray-50);
+  margin-left: 4px;
 }
 
 /* Excel sheet tabs */
@@ -702,6 +812,71 @@ body {
   max-height: calc(100vh - 200px);
   object-fit: contain;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* HTML viewer */
+.html-viewer {
+  height: 100%;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.toggle-btn {
+  background: transparent;
+  border: 1px solid var(--gray-70);
+  color: var(--gray-50);
+  padding: 2px 8px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.toggle-btn:hover {
+  background: var(--gray-80);
+  color: var(--gray-30);
+}
+
+.toggle-btn.active {
+  background: var(--gray-80);
+  color: var(--volt);
+  border-color: var(--volt);
+}
+
+.html-preview-container,
+.html-source-container {
+  display: none;
+  flex: 1;
+  overflow: hidden;
+}
+
+.html-preview-container.active,
+.html-source-container.active {
+  display: flex;
+}
+
+.html-preview {
+  flex: 1;
+  border: none;
+  background: white;
+}
+
+.html-source {
+  flex: 1;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--gray-20);
+  background: var(--gray-100);
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 /* PowerPoint placeholder */
