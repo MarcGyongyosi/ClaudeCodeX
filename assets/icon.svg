@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#161616"/>
+  <rect x="40" y="40" width="432" height="432" fill="#262626" stroke="#E20000" stroke-width="4"/>
+  <!-- Viewfinder corners -->
+  <path d="M60 100 L60 60 L100 60" fill="none" stroke="#E20000" stroke-width="6"/>
+  <path d="M412 60 L452 60 L452 100" fill="none" stroke="#E20000" stroke-width="6"/>
+  <path d="M452 412 L452 452 L412 452" fill="none" stroke="#E20000" stroke-width="6"/>
+  <path d="M100 452 L60 452 L60 412" fill="none" stroke="#E20000" stroke-width="6"/>
+  <!-- Terminal prompt -->
+  <text x="120" y="280" font-family="monospace" font-size="120" font-weight="bold" fill="#D8FF34">></text>
+  <rect x="200" y="220" width="180" height="80" fill="#E20000"/>
+  <!-- Cursor blink -->
+  <rect x="390" y="220" width="20" height="80" fill="#f4f4f4"/>
+</svg>
