@@ -293,26 +293,55 @@ body {
   background: var(--gray-100);
 }
 
-/* Tab bar */
-.tab-bar {
+/* Global toolbar */
+.global-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   background: var(--gray-90);
   border-bottom: 1px solid var(--gray-80);
-  height: 32px;
+  height: 28px;
   padding: 0 8px;
 }
 
-.tabs-container {
+.toolbar-spacer {
+  flex: 1;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 4px;
+}
+
+/* Panel tab bar */
+.panel-tab-bar {
+  display: flex;
+  align-items: center;
+  background: var(--gray-100);
+  border-bottom: 1px solid var(--gray-80);
+  height: 32px;
+  padding: 0 4px;
+  min-height: 32px;
+}
+
+.panel-tabs {
   display: flex;
   gap: 2px;
   overflow-x: auto;
   flex: 1;
 }
 
-.tabs-container::-webkit-scrollbar {
+.panel-tabs::-webkit-scrollbar {
   display: none;
+}
+
+/* Panel content area */
+.panel-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
 }
 
 .tab {
@@ -362,12 +391,6 @@ body {
   background: var(--gray-70);
 }
 
-.tab-actions {
-  display: flex;
-  gap: 4px;
-  padding-left: 8px;
-  border-left: 1px solid var(--gray-80);
-}
 
 /* Panels container */
 .panels-container {

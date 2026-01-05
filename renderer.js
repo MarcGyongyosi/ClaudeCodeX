@@ -14,8 +14,6 @@ const welcomeScreen = document.getElementById('welcome-screen');
 const terminalContainer = document.getElementById('terminal-container');
 const sessionStatus = document.getElementById('session-status');
 const terminalSize = document.getElementById('terminal-size');
-const tabBar = document.getElementById('tab-bar');
-const tabsContainer = tabBar.querySelector('.tabs-container');
 const primaryPanel = document.getElementById('primary-panel');
 const secondaryPanel = document.getElementById('secondary-panel');
 const resizeHandle = document.getElementById('resize-handle');
@@ -38,10 +36,25 @@ let sessionActive = false;
 let splitViewActive = false;
 let claudeInstalled = false;
 
-// Tab management
-const tabs = new Map(); // id -> { type, title, element, contentElement, data, panel }
-let activeTabId = 'terminal';
+// Tab management - now per panel
+const tabs = new Map(); // id -> { type, title, tabElement, contentElement, data, panel }
 let tabIdCounter = 0;
+
+// Track active tab per panel
+const panelState = {
+  primary: { activeTabId: 'terminal' },
+  secondary: { activeTabId: null }
+};
+
+// Get panel elements
+function getPanelElements(panelName) {
+  const panelEl = panelName === 'secondary' ? secondaryPanel : primaryPanel;
+  return {
+    panel: panelEl,
+    tabBar: panelEl.querySelector('.panel-tabs'),
+    content: panelEl.querySelector('.panel-content')
+  };
+}
 
 // Context menu state
 let contextMenuTarget = null;
@@ -67,14 +80,19 @@ async function init() {
   await refreshFileTree();
 
   // Initialize terminal tab in the map
+  const primaryElements = getPanelElements('primary');
   tabs.set('terminal', {
     type: 'terminal',
     title: 'Terminal',
-    element: tabsContainer.querySelector('[data-tab-id="terminal"]'),
+    tabElement: primaryElements.tabBar.querySelector('[data-tab-id="terminal"]'),
     contentElement: document.getElementById('tab-terminal'),
     closeable: false,
     panel: 'primary'
   });
+
+  // Setup tab click handlers for both panels
+  setupPanelTabHandlers('primary');
+  setupPanelTabHandlers('secondary');
 
   // Load recent sessions
   updateRecentSessionsUI();
@@ -159,6 +177,69 @@ function updateFolderPath(path) {
   }
 }
 
+// Setup click handlers for a panel's tab bar
+function setupPanelTabHandlers(panelName) {
+  const { tabBar } = getPanelElements(panelName);
+
+  tabBar.addEventListener('click', (e) => {
+    const tabEl = e.target.closest('.tab');
+    if (!tabEl) return;
+
+    const tabId = tabEl.dataset.tabId;
+
+    // Check if close button was clicked
+    if (e.target.classList.contains('tab-close')) {
+      closeTab(tabId);
+      return;
+    }
+
+    activateTabInPanel(tabId, panelName);
+  });
+
+  tabBar.addEventListener('contextmenu', (e) => {
+    const tabEl = e.target.closest('.tab');
+    if (!tabEl) return;
+
+    e.preventDefault();
+    const tabId = tabEl.dataset.tabId;
+
+    // Only show context menu if split view is active
+    if (!splitViewActive) return;
+
+    tabContextMenuTarget = tabId;
+
+    // Update menu items based on current panel
+    const tab = tabs.get(tabId);
+    const moveLeftItem = tabContextMenu.querySelector('[data-action="move-left"]');
+    const moveRightItem = tabContextMenu.querySelector('[data-action="move-right"]');
+
+    if (tab.panel === 'primary') {
+      moveLeftItem.style.display = 'none';
+      moveRightItem.style.display = 'block';
+    } else {
+      moveLeftItem.style.display = 'block';
+      moveRightItem.style.display = 'none';
+    }
+
+    // Show close option only for closeable tabs
+    const closeItem = tabContextMenu.querySelector('[data-action="close-tab"]');
+    closeItem.style.display = tab.closeable !== false ? 'block' : 'none';
+
+    tabContextMenu.style.left = e.clientX + 'px';
+    tabContextMenu.style.top = e.clientY + 'px';
+    tabContextMenu.classList.remove('hidden');
+
+    // Adjust if menu goes off screen
+    const rect = tabContextMenu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+      tabContextMenu.style.left = (e.clientX - rect.width) + 'px';
+    }
+    if (rect.bottom > window.innerHeight) {
+      tabContextMenu.style.top = (e.clientY - rect.height) + 'px';
+    }
+  });
+}
+
 // Event listeners
 function setupEventListeners() {
   // Folder selection
@@ -188,12 +269,6 @@ function setupEventListeners() {
   // Split view toggle
   splitViewBtn.addEventListener('click', toggleSplitView);
 
-  // Tab clicks
-  tabsContainer.addEventListener('click', handleTabClick);
-
-  // Tab right-click for context menu
-  tabsContainer.addEventListener('contextmenu', handleTabContextMenu);
-
   // Drag and drop
   setupDragDrop();
 
@@ -218,55 +293,12 @@ function setupEventListeners() {
   });
 }
 
-// Handle right-click on tabs
-function handleTabContextMenu(e) {
-  const tabEl = e.target.closest('.tab');
-  if (!tabEl) return;
+// Tab management functions - now panel-aware
 
-  e.preventDefault();
-  const tabId = tabEl.dataset.tabId;
-
-  // Don't show move options if split view is not active
-  if (!splitViewActive) {
-    return;
-  }
-
-  tabContextMenuTarget = tabId;
-
-  // Update menu items based on current panel
-  const tab = tabs.get(tabId);
-  const moveLeftItem = tabContextMenu.querySelector('[data-action="move-left"]');
-  const moveRightItem = tabContextMenu.querySelector('[data-action="move-right"]');
-
-  if (tab.panel === 'primary') {
-    moveLeftItem.style.display = 'none';
-    moveRightItem.style.display = 'block';
-  } else {
-    moveLeftItem.style.display = 'block';
-    moveRightItem.style.display = 'none';
-  }
-
-  // Show close option only for closeable tabs
-  const closeItem = tabContextMenu.querySelector('[data-action="close-tab"]');
-  closeItem.style.display = tab.closeable ? 'block' : 'none';
-
-  tabContextMenu.style.left = e.clientX + 'px';
-  tabContextMenu.style.top = e.clientY + 'px';
-  tabContextMenu.classList.remove('hidden');
-
-  // Adjust if menu goes off screen
-  const rect = tabContextMenu.getBoundingClientRect();
-  if (rect.right > window.innerWidth) {
-    tabContextMenu.style.left = (e.clientX - rect.width) + 'px';
-  }
-  if (rect.bottom > window.innerHeight) {
-    tabContextMenu.style.top = (e.clientY - rect.height) + 'px';
-  }
-}
-
-// Tab management functions
-function createTab(type, title, data = {}) {
+// Create a tab in a specific panel
+function createTab(type, title, data = {}, panelName = 'primary') {
   const id = `tab-${++tabIdCounter}`;
+  const { tabBar, content } = getPanelElements(panelName);
 
   // Create tab element
   const tabEl = document.createElement('div');
@@ -282,78 +314,90 @@ function createTab(type, title, data = {}) {
     <span class="tab-close">×</span>
   `;
 
-  tabsContainer.appendChild(tabEl);
+  tabBar.appendChild(tabEl);
 
   // Create content element
   const contentEl = document.createElement('div');
   contentEl.className = 'tab-content';
   contentEl.dataset.tabId = id;
-  primaryPanel.appendChild(contentEl);
+  content.appendChild(contentEl);
 
   // Store tab data
   tabs.set(id, {
     type,
     title,
-    element: tabEl,
+    tabElement: tabEl,
     contentElement: contentEl,
     closeable: true,
     data,
-    panel: 'primary'
+    panel: panelName
   });
 
   return id;
 }
 
-function activateTab(tabId) {
-  // Deactivate current tab
-  const currentTab = tabs.get(activeTabId);
-  if (currentTab) {
-    currentTab.element.classList.remove('active');
-    currentTab.contentElement.classList.remove('active');
+// Activate a tab within its panel
+function activateTabInPanel(tabId, panelName) {
+  const tab = tabs.get(tabId);
+  if (!tab) return;
+
+  // Deactivate current active tab in this panel
+  const currentActiveId = panelState[panelName].activeTabId;
+  if (currentActiveId && currentActiveId !== tabId) {
+    const currentTab = tabs.get(currentActiveId);
+    if (currentTab && currentTab.panel === panelName) {
+      currentTab.tabElement.classList.remove('active');
+      currentTab.contentElement.classList.remove('active');
+    }
   }
 
   // Activate new tab
-  const newTab = tabs.get(tabId);
-  if (newTab) {
-    newTab.element.classList.add('active');
-    newTab.contentElement.classList.add('active');
-    activeTabId = tabId;
+  tab.tabElement.classList.add('active');
+  tab.contentElement.classList.add('active');
+  panelState[panelName].activeTabId = tabId;
 
-    // Refit terminal if switching to terminal tab
-    if (tabId === 'terminal' && fitAddon && terminal) {
-      setTimeout(() => fitAddon.fit(), 10);
+  // Refit terminal if activating terminal tab
+  if (tabId === 'terminal' && fitAddon && terminal) {
+    setTimeout(() => fitAddon.fit(), 10);
+  }
+}
+
+// Close a tab
+function closeTab(tabId) {
+  const tab = tabs.get(tabId);
+  if (!tab || tab.closeable === false) return;
+
+  const panelName = tab.panel;
+
+  // Remove elements
+  tab.tabElement.remove();
+  tab.contentElement.remove();
+  tabs.delete(tabId);
+
+  // If closing active tab in panel, activate another tab
+  if (panelState[panelName].activeTabId === tabId) {
+    // Find another tab in the same panel
+    let newActiveId = null;
+    tabs.forEach((t, id) => {
+      if (t.panel === panelName && !newActiveId) {
+        newActiveId = id;
+      }
+    });
+
+    if (newActiveId) {
+      activateTabInPanel(newActiveId, panelName);
+    } else {
+      panelState[panelName].activeTabId = null;
     }
   }
 }
 
-function closeTab(tabId) {
+// Legacy function for compatibility
+function activateTab(tabId) {
   const tab = tabs.get(tabId);
-  if (!tab || !tab.closeable) return;
-
-  // Remove elements
-  tab.element.remove();
-  tab.contentElement.remove();
-  tabs.delete(tabId);
-
-  // If closing active tab, switch to terminal
-  if (activeTabId === tabId) {
-    activateTab('terminal');
+  if (tab) {
+    activateTabInPanel(tabId, tab.panel);
   }
-}
-
-function handleTabClick(e) {
-  const tabEl = e.target.closest('.tab');
-  if (!tabEl) return;
-
-  const tabId = tabEl.dataset.tabId;
-
-  // Check if close button was clicked
-  if (e.target.classList.contains('tab-close')) {
-    closeTab(tabId);
-    return;
-  }
-
-  activateTab(tabId);
 }
 
 function findExistingTab(type, identifier) {
@@ -764,53 +808,50 @@ function toggleSplitView() {
     primaryPanel.style.flex = '1';
     secondaryPanel.style.flex = '1';
 
-    // If current active tab is not terminal, move it to secondary panel
-    // and show terminal in primary
-    if (activeTabId !== 'terminal') {
-      const currentTab = tabs.get(activeTabId);
-      if (currentTab) {
-        // Move current tab to secondary
-        secondaryPanel.appendChild(currentTab.contentElement);
-        currentTab.contentElement.classList.add('active');
-        currentTab.panel = 'secondary';
+    // If current active tab in primary is not terminal, move it to secondary
+    const primaryActiveId = panelState.primary.activeTabId;
+    if (primaryActiveId && primaryActiveId !== 'terminal') {
+      moveTabToPanel(primaryActiveId, 'secondary');
+      // Make sure terminal is active in primary
+      activateTabInPanel('terminal', 'primary');
+    }
 
-        // Show terminal in primary
-        const terminalTab = tabs.get('terminal');
-        if (terminalTab) {
-          terminalTab.contentElement.classList.add('active');
-        }
-
-        // Refit terminal
-        if (fitAddon && terminal) {
-          setTimeout(() => fitAddon.fit(), 50);
-        }
-      }
+    // Refit terminal
+    if (fitAddon && terminal) {
+      setTimeout(() => fitAddon.fit(), 50);
     }
   } else {
     // Move all tabs from secondary back to primary
-    const secondaryTabs = secondaryPanel.querySelectorAll('.tab-content');
-    secondaryTabs.forEach(content => {
-      content.classList.remove('active');
-      primaryPanel.appendChild(content);
-      // Update tab panel property
-      const tabId = content.dataset.tabId;
-      const tab = tabs.get(tabId);
-      if (tab) tab.panel = 'primary';
+    const tabsToMove = [];
+    tabs.forEach((tab, id) => {
+      if (tab.panel === 'secondary') {
+        tabsToMove.push(id);
+      }
+    });
+
+    tabsToMove.forEach(tabId => {
+      moveTabToPanel(tabId, 'primary', false); // Don't activate, just move
     });
 
     secondaryPanel.classList.add('hidden');
     resizeHandle.classList.add('hidden');
     splitViewBtn.classList.remove('active');
 
-    // Reset primary panel width
+    // Reset panel widths
     primaryPanel.style.flex = '1';
     primaryPanel.style.width = '';
     secondaryPanel.style.flex = '';
 
-    // Ensure active tab in primary is visible
-    const activeTab = tabs.get(activeTabId);
-    if (activeTab) {
-      activeTab.contentElement.classList.add('active');
+    // Clear secondary panel state
+    panelState.secondary.activeTabId = null;
+
+    // Make sure primary has an active tab
+    if (panelState.primary.activeTabId) {
+      const activeTab = tabs.get(panelState.primary.activeTabId);
+      if (activeTab) {
+        activeTab.tabElement.classList.add('active');
+        activeTab.contentElement.classList.add('active');
+      }
     }
 
     // Refit terminal
@@ -820,41 +861,63 @@ function toggleSplitView() {
   }
 }
 
-function moveTabToPanel(tabId, panel) {
+// Move a tab to a different panel
+function moveTabToPanel(tabId, targetPanelName, activate = true) {
   const tab = tabs.get(tabId);
   if (!tab) return;
 
-  const sourcePanel = tab.panel;
-  const targetPanel = panel === 'secondary' ? secondaryPanel : primaryPanel;
-  const sourcePanelEl = sourcePanel === 'secondary' ? secondaryPanel : primaryPanel;
+  const sourcePanelName = tab.panel;
+  if (sourcePanelName === targetPanelName) return;
 
-  // Deactivate all tabs in target panel
-  targetPanel.querySelectorAll('.tab-content').forEach(content => {
-    content.classList.remove('active');
-  });
+  const { tabBar: sourceTabBar, content: sourceContent } = getPanelElements(sourcePanelName);
+  const { tabBar: targetTabBar, content: targetContent } = getPanelElements(targetPanelName);
 
-  // Move and activate in target
-  targetPanel.appendChild(tab.contentElement);
-  tab.contentElement.classList.add('active');
-  tab.panel = panel;
+  // Remove active state from tab
+  tab.tabElement.classList.remove('active');
+  tab.contentElement.classList.remove('active');
 
-  // Find another tab to activate in the source panel
-  const remainingTabsInSource = [];
-  tabs.forEach((t, id) => {
-    if (t.panel === sourcePanel && id !== tabId) {
-      remainingTabsInSource.push({ id, tab: t });
+  // Move tab element to target tab bar
+  targetTabBar.appendChild(tab.tabElement);
+
+  // Move content element to target content area
+  targetContent.appendChild(tab.contentElement);
+
+  // Update tab's panel
+  tab.panel = targetPanelName;
+
+  // Update source panel: if this was the active tab, activate another
+  if (panelState[sourcePanelName].activeTabId === tabId) {
+    let newActiveId = null;
+    // Prefer terminal
+    if (sourcePanelName === 'primary') {
+      const terminalTab = tabs.get('terminal');
+      if (terminalTab && terminalTab.panel === 'primary') {
+        newActiveId = 'terminal';
+      }
     }
-  });
+    // Otherwise find any tab in source panel
+    if (!newActiveId) {
+      tabs.forEach((t, id) => {
+        if (t.panel === sourcePanelName && !newActiveId) {
+          newActiveId = id;
+        }
+      });
+    }
 
-  if (remainingTabsInSource.length > 0) {
-    // Activate the first remaining tab (prefer terminal)
-    const terminalInSource = remainingTabsInSource.find(t => t.id === 'terminal');
-    const tabToActivate = terminalInSource || remainingTabsInSource[0];
-    tabToActivate.tab.contentElement.classList.add('active');
+    if (newActiveId) {
+      activateTabInPanel(newActiveId, sourcePanelName);
+    } else {
+      panelState[sourcePanelName].activeTabId = null;
+    }
   }
 
-  // Refit terminal if needed
-  if (fitAddon && terminal) {
+  // Activate in target panel if requested
+  if (activate) {
+    activateTabInPanel(tabId, targetPanelName);
+  }
+
+  // Refit terminal if it was involved
+  if (tabId === 'terminal' && fitAddon && terminal) {
     setTimeout(() => fitAddon.fit(), 50);
   }
 }
@@ -1005,10 +1068,9 @@ function handleTabContextMenuAction(e) {
   hideContextMenu();
 }
 
-// Move tab to a panel and update its state (called from context menu)
-function moveTabToPanelWithUI(tabId, panel) {
-  // Just use the main moveTabToPanel function which handles everything
-  moveTabToPanel(tabId, panel);
+// Move tab to a panel (called from context menu)
+function moveTabToPanelWithUI(tabId, panelName) {
+  moveTabToPanel(tabId, panelName, true);
 }
 
 // Recursively expand all subdirectories

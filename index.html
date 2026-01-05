@@ -57,17 +57,12 @@
         </div>
       </aside>
 
-      <!-- Content area with tabs -->
+      <!-- Content area with panels -->
       <div id="content-area" class="content-area">
-        <!-- Tab bar -->
-        <div id="tab-bar" class="tab-bar">
-          <div class="tabs-container">
-            <div class="tab active" data-tab-id="terminal">
-              <span class="tab-icon">◆</span>
-              <span class="tab-title">Terminal</span>
-            </div>
-          </div>
-          <div class="tab-actions">
+        <!-- Global toolbar -->
+        <div id="global-toolbar" class="global-toolbar">
+          <div class="toolbar-spacer"></div>
+          <div class="toolbar-actions">
             <button id="split-view-btn" class="icon-btn" title="Toggle split view">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -77,12 +72,23 @@
           </div>
         </div>
 
-        <!-- Tab panels container -->
+        <!-- Panels container -->
         <div id="panels-container" class="panels-container">
           <!-- Primary panel (left/main) -->
           <div id="primary-panel" class="panel">
-            <!-- Terminal tab content -->
-            <div id="tab-terminal" class="tab-content active" data-tab-id="terminal">
+            <!-- Panel tab bar -->
+            <div class="panel-tab-bar" data-panel="primary">
+              <div class="panel-tabs">
+                <div class="tab active" data-tab-id="terminal">
+                  <span class="tab-icon">◆</span>
+                  <span class="tab-title">Terminal</span>
+                </div>
+              </div>
+            </div>
+            <!-- Panel content -->
+            <div class="panel-content">
+              <!-- Terminal tab content -->
+              <div id="tab-terminal" class="tab-content active" data-tab-id="terminal">
               <!-- Drop zone overlay -->
               <div id="drop-zone" class="drop-zone hidden">
                 <div class="drop-content">
@@ -148,13 +154,21 @@
               <!-- Terminal container (xterm renders here) -->
               <div id="terminal-container" class="terminal-container hidden"></div>
             </div>
+            </div><!-- end panel-content -->
           </div>
 
           <!-- Resize handle for split view -->
           <div id="resize-handle" class="resize-handle hidden"></div>
 
           <!-- Secondary panel (right, for split view) -->
-          <div id="secondary-panel" class="panel hidden"></div>
+          <div id="secondary-panel" class="panel hidden">
+            <!-- Panel tab bar -->
+            <div class="panel-tab-bar" data-panel="secondary">
+              <div class="panel-tabs"></div>
+            </div>
+            <!-- Panel content -->
+            <div class="panel-content"></div>
+          </div>
         </div>
       </div>
     </main>
