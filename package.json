@@ -1,9 +1,12 @@
 {
   "name": "claude-code-gui",
   "productName": "Claude Code",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "A native GUI wrapper for Claude Code CLI with integrated file browser, document viewer, and web browser",
-  "author": "Marc Gyongyosi",
+  "author": {
+    "name": "Marc Gyongyosi",
+    "email": "marc@claudecodex.dev"
+  },
   "main": "main.js",
   "repository": {
     "type": "git",
